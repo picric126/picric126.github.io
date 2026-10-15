@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>JPA 9-Ball Scorer</title>
+<style>
+  :root {
+    --bg-color: #0b0c10;
+    --surface-color: #1f2833;
+    --accent-color: #66fcf1;
+    --accent-hover: #45a29e;
+    --text-main: #c5c6c7;
+    --text-light: #ffffff;
+    --danger-color: #e74c3c;
+    --warning-color: #f1c40f;
+    --text-muted: #888888;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 0;
+    background-color: var(--bg-color);
+    color: var(--text-main);
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  #app {
+    max-width: 480px;
+    margin: 0 auto;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  h1, h2, h3 { color: var(--accent-color); text-align: center; font-weight: 300; letter-spacing: 1px; margin-top: 0; }
+
+  .btn {
+    background-color: var(--surface-color); color: var(--accent-color);
+    border: 1px solid var(--accent-hover); padding: 15px; font-size: 16px;
+    border-radius: 8px; cursor: pointer; width: 100%; margin-bottom: 15px;
+    text-transform: uppercase; letter-spacing: 1px; transition: all 0.2s;
+  }
+  .btn:active { background-color: var(--accent-hover); color: var(--bg-color); }
+  .btn.primary { background-color: var(--accent-hover); color: var(--bg-color); font-weight: bold; }
+  
+  .btn.danger-mode { 
+    background-color: rgba(231, 76, 60, 0.1); 
+    color: var(--danger-color); 
+    border-color: var(--danger-color); 
+    font-weight: bold; 
+    letter-spacing: 1px;
+  }
+  .btn.danger-mode:active { background-color: var(--danger-color); color: white; }
+  .btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  .scroll-area { flex: 1; overflow-y: auto; padding-bottom: 20px; }
+  .form-group { margin-bottom: 20px; }
+  .form-group label { display: block; margin-bottom: 5px; color: var(--text-main); }
+  .form-control {
+    width: 100%; padding: 12px; background-color: var(--bg-color);
+    border: 1px solid var(--surface-color); color: var(--text-light);
+    border-radius: 5px; font-size: 16px;
+  }
+
+  .radio-group {
+    display: flex; gap: 15px; background-color: var(--bg-color);
+    border: 1px solid var(--surface-color); padding: 10px; border-radius: 5px;
+  }
+  .radio-group label { display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-light); }
+
+  .top-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-shrink: 0; }
+  .btn-home { color: var(--danger-color); cursor: pointer; font-weight: bold; font-size: 14px; padding: 5px 10px 5px 0; }
+  .btn-records { color: var(--accent-color); cursor: pointer; font-weight: bold; font-size: 14px; padding: 5px 0 5px 10px; }
+
+  .header-stats {
+    display: flex; justify-content: space-between; background: var(--surface-color);
+    padding: 10px 15px; border-radius: 8px; margin-bottom: 15px; font-size: 14px;
+    border-left: 4px solid var(--accent-color); flex-shrink: 0;
+  }
+
+  .scoreboard { display: flex; gap: 10px; margin-bottom: 10px; flex-shrink: 0; width: 100%; }
+  .player-card {
+    flex: 1; background: var(--surface-color); border-radius: 10px; padding: 12px 10px;
+    text-align: center; border: 2px solid transparent; transition: all 0.3s;
+  }
+  .player-card.active { border-color: var(--accent-color); box-shadow: 0 0 15px rgba(102, 252, 241, 0.2); }
+  .player-card .name { font-size: 14px; margin-bottom: 2px; color: var(--text-main); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .player-card .score { font-size: 28px; font-weight: bold; color: var(--text-light); margin: 6px 0; }
+  .player-card .pt-info { font-size: 13px; color: var(--accent-color); font-weight: bold; margin-bottom: 6px; }
+  .player-card .pt-next { font-size: 11px; color: var(--text-main); font-weight: normal; opacity: 0.7; }
+  .player-card .safety { font-size: 11px; color: #888; margin-top: 4px; }
+
+  .result-details {
+    margin-top: 15px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);
+    font-size: 13px; color: var(--text-main); text-align: left;
+  }
+  .result-details > div { display: flex; justify-content: space-between; margin-bottom: 6px; }
+  .result-details > div:last-child { margin-bottom: 0; }
+
+  .log-container {
+    flex: 1; overflow-y: auto; background-color: rgba(31, 40, 51, 0.4);
+    border-radius: 8px; margin-bottom: 15px; border: 1px solid var(--surface-color);
+  }
+  .log-row { display: flex; border-bottom: 1px solid rgba(255,255,255,0.05); padding: 6px 0; min-height: 34px; }
+  .log-col { display: flex; align-items: center; }
+  .log-col.inning { width: 35px; justify-content: center; color: var(--accent-color); font-size: 12px; font-weight: bold; }
+  .log-col.playerL { flex: 1; justify-content: flex-end; gap: 3px; padding-right: 8px; }
+  .log-col.playerR { flex: 1; justify-content: flex-start; gap: 3px; padding-left: 8px; }
+  .log-text { font-size: 10px; color: var(--text-main); background: var(--surface-color); padding: 2px 4px; border-radius: 3px;}
+
+  .balls-area { flex-shrink: 0; position: relative; min-height: 160px;}
+  .balls-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; justify-items: center; margin-bottom: 10px; }
+  .ball {
+    width: 58px; height: 58px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 24px; font-weight: bold; cursor: pointer; color: #fff;
+    box-shadow: inset -2px -2px 5px rgba(0,0,0,0.5), 2px 2px 5px rgba(0,0,0,0.3);
+  }
+  .ball.inactive { opacity: 0.1; pointer-events: none; filter: grayscale(1); }
+  .ball.locked { pointer-events: none; opacity: 0.4; filter: contrast(0.5); }
+  
+  .b1 { background: radial-gradient(circle at 30% 30%, #f4d03f, #b7950b); color: #000; }
+  .b2 { background: radial-gradient(circle at 30% 30%, #3498db, #154360); }
+  .b3 { background: radial-gradient(circle at 30% 30%, #e74c3c, #641e16); }
+  .b4 { background: radial-gradient(circle at 30% 30%, #9b59b6, #4a235a); }
+  .b5 { background: radial-gradient(circle at 30% 30%, #e67e22, #7e5109); color: #000; }
+  .b6 { background: radial-gradient(circle at 30% 30%, #2ecc71, #145a32); }
+  .b7 { background: radial-gradient(circle at 30% 30%, #a04000, #421606); }
+  .b8 { background: radial-gradient(circle at 30% 30%, #333333, #000000); }
+  .b9 { background: linear-gradient(0deg, #eeeeee 25%, #f4d03f 25%, #f4d03f 75%, #eeeeee 75%); color: #000; border: 1px solid #ccc;}
+  
+  .mini-ball { width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: bold; color: #fff; }
+  .mini-ball.dead { opacity: 0.3; border: 1px dotted #fff; }
+
+  .overlay-btn-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; z-index: 10; }
+
+  .controls-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; flex-shrink: 0; padding-bottom: 10px; }
+  .controls-grid .btn { margin-bottom: 0; font-size: 12px; padding: 12px 2px; }
+
+  .result-panel { background: var(--surface-color); padding: 15px; border-radius: 8px; width: 100%; text-align: center; margin-bottom: 15px; }
+
+  .modal-overlay {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(11, 12, 16, 0.9); z-index: 100;
+    display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px;
+  }
+  .modal-box {
+    background: var(--surface-color); padding: 25px 20px; border-radius: 10px;
+    border: 1px solid var(--danger-color); text-align: center; width: 100%; max-width: 320px;
+    box-shadow: 0 0 20px rgba(231, 76, 60, 0.2);
+  }
+  .modal-msg { color: var(--text-light); margin-bottom: 25px; line-height: 1.6; font-size: 15px; font-weight: bold;}
+  .modal-sub { color: var(--danger-color); font-size: 12px; display: block; margin-top: 8px; font-weight: normal; }
+  .modal-btns { display: flex; gap: 10px; }
+  .modal-btns .btn { margin-bottom: 0; padding: 12px; font-size: 14px; }
+  
+  .record-item {
+    background: var(--surface-color); padding: 15px; border-radius: 8px; margin-bottom: 10px;
+    font-size: 14px; cursor: pointer; border: 1px solid transparent; transition: all 0.2s; position: relative;
+  }
+  .record-item:hover, .record-item:active { border-color: var(--accent-hover); }
+
+  .btn-delete-record {
+    position: absolute; top: 10px; right: 10px;
+    background: rgba(231, 76, 60, 0.2); color: var(--danger-color);
+    border: none; border-radius: 4px; width: 24px; height: 24px;
+    font-size: 12px; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; z-index: 2; transition: all 0.2s;
+  }
+  .btn-delete-record:hover, .btn-delete-record:active { background: var(--danger-color); color: white; }
+
+  .winner-crown { color: var(--warning-color); font-size: 18px; margin-bottom: 5px; font-weight: bold; letter-spacing: 1px; }
+  .loser-mark { color: var(--text-muted); font-size: 14px; margin-bottom: 5px; font-weight: bold; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+  const SAVE_KEY = 'jpaScoreApp_v21'; 
+  
+  const JPA_GOALS = { 1:14, 2:19, 3:25, 4:31, 5:38, 6:46, 7:55, 8:65, 9:75 };
+  const POINTS_THRESHOLDS = {
+    1: [3, 4, 5, 7, 8, 9, 11, 12], 2: [4, 6, 8, 9, 11, 13, 15, 17],
+    3: [5, 7, 10, 12, 15, 17, 20, 22], 4: [6, 9, 12, 15, 19, 22, 25, 28],
+    5: [7, 11, 15, 19, 23, 27, 30, 34], 6: [9, 13, 18, 23, 28, 32, 37, 41],
+    7: [11, 16, 22, 27, 33, 38, 44, 50], 8: [14, 20, 27, 33, 40, 46, 53, 59],
+    9: [18, 25, 32, 39, 47, 54, 61, 68]
+  };
+
+  let state = {
+    view: 'setup',
+    player1: { name: 'Player 1', sl: 4, goal: 31, score: 0 },
+    player2: { name: 'Player 2', sl: 4, goal: 31, score: 0 },
+    game: null, history: [], records: [],
+    deleteModal: { show: false, type: '', index: null }
+  };
+
+  const clone = (obj) => JSON.parse(JSON.stringify(obj));
+
+  const formatTime = (ts) => {
+    if (!ts) return '--:--';
+    const d = new Date(ts);
+    const h = String(d.getHours()).padStart(2, '0');
+    const m = String(d.getMinutes()).padStart(2, '0');
+    return `${h}:${m}`;
+  };
+
+  const getLoserPoints = (sl, score) => {
+    const t = POINTS_THRESHOLDS[sl];
+    for(let i=0; i<8; i++) if(score < t[i]) return i;
+    return 8;
+  };
+
+  const getPointInfo = (sl, score, goal) => {
+    const t = POINTS_THRESHOLDS[sl];
+    let pts = 0; let req = t[0];
+    if (score < t[0]) { pts = 0; req = t[0]; }
+    else if (score < t[1]) { pts = 1; req = t[1]; }
+    else if (score < t[2]) { pts = 2; req = t[2]; }
+    else if (score < t[3]) { pts = 3; req = t[3]; }
+    else if (score < t[4]) { pts = 4; req = t[4]; }
+    else if (score < t[5]) { pts = 5; req = t[5]; }
+    else if (score < t[6]) { pts = 6; req = t[6]; }
+    else if (score < t[7]) { pts = 7; req = t[7]; }
+    else { pts = 8; req = goal; }
+    
+    if (score >= goal) return { ptText: 'WIN', nextText: '-' };
+    return { ptText: pts, nextText: `+${req - score}` };
+  };
+
+  const generateLogHTML = (logObject) => {
+    let html = '';
+    Object.keys(logObject).sort((a,b)=>a-b).forEach(i => {
+      const turn = logObject[i];
+      const renderP = (data, isL) => {
+        let items = [];
+        if(data.b) items.push('<span class="log-text">Brk</span>');
+        data.events.forEach(ev => items.push(`<div class="mini-ball b${ev.num} ${ev.type==='dead'?'dead':''}">${ev.num}</div>`));
+        if(data.s) items.push('<span class="log-text">S</span>');
+        if(!isL) items.reverse();
+        return items.join('');
+      };
+      html += `<div class="log-row"><div class="log-col playerL">${renderP(turn.player1,true)}</div><div class="log-col inning">${i}</div><div class="log-col playerR">${renderP(turn.player2,false)}</div></div>`;
+    });
+    return html;
+  };
+
+  function render() {
+    const app = document.getElementById('app');
+    
+    if (state.view === 'setup') {
+      app.innerHTML = `
+        <div class="top-nav" style="justify-content: flex-end;">
+          <div id="btn-nav-records" class="btn-records">RECORDS ≫</div>
+        </div>
+        <h1 style="margin-bottom:20px; margin-top:0;">JPA 9-Ball</h1>
+        <div class="scroll-area">
+          <div class="form-group"><label>Player 1 Name</label><input type="text" id="p1-name" class="form-control" value="${state.player1.name}"><select id="p1-sl" class="form-control" style="margin-top:10px;">${[1,2,3,4,5,6,7,8,9].map(s=>`<option value="${s}" ${state.player1.sl==s?'selected':''}>SL ${s} (Goal:${JPA_GOALS[s]})</option>`).join('')}</select></div>
+          <div class="form-group"><label>Player 2 Name</label><input type="text" id="p2-name" class="form-control" value="${state.player2.name}"><select id="p2-sl" class="form-control" style="margin-top:10px;">${[1,2,3,4,5,6,7,8,9].map(s=>`<option value="${s}" ${state.player2.sl==s?'selected':''}>SL ${s} (Goal:${JPA_GOALS[s]})</option>`).join('')}</select></div>
+          <div class="form-group" style="margin-top: 30px;"><label>Starting Player (Break)</label><div class="radio-group">
+            <label><input type="radio" name="startP" value="player1" checked> <span id="label-p1">${state.player1.name}</span></label>
+            <label><input type="radio" name="startP" value="player2"> <span id="label-p2">${state.player2.name}</span></label>
+          </div></div>
+          <button class="btn primary" id="btn-start" style="margin-top:20px;">Start Match</button>
+        </div>`;
+    } 
+    else if (state.view === 'game') {
+      const g = state.game;
+      
+      const p1Pt = getPointInfo(state.player1.sl, state.player1.score, state.player1.goal);
+      const p2Pt = getPointInfo(state.player2.sl, state.player2.score, state.player2.goal);
+      
+      const logHTML = generateLogHTML(g.log);
+
+      let ballsHTML = '';
+      for(let i=1; i<=9; i++) {
+        const isPocketed = !g.balls.includes(i);
+        const isLocked = (g.safetyLocked || g.rackEndLocked) && !isPocketed;
+        ballsHTML += `<div class="ball b${i} ${isPocketed?'inactive':''} ${isLocked?'locked':''}" data-num="${i}">${i}</div>`;
+      }
+      
+      const pLog = g.log[g.currentInning][g.activePlayer];
+      const canDead = pLog && pLog.events.length > 0 && pLog.events[pLog.events.length - 1].type === 'score';
+
+      let quitModalHTML = '';
+      if (g.showQuitConfirm) {
+        quitModalHTML = `<div class="modal-overlay"><div class="modal-box"><div class="modal-msg">試合を中断して戻りますか？<span class="modal-sub">（現在の進行状況は破棄されます）</span></div><div class="modal-btns"><button class="btn" id="btn-cancel-quit">Cancel</button><button class="btn danger-mode" id="btn-confirm-quit">Quit Match</button></div></div></div>`;
+      }
+
+      app.innerHTML = `
+        ${quitModalHTML}
+        <div class="top-nav">
+          <div id="btn-quit-match" class="btn-home">＜ QUIT</div>
+        </div>
+        <div class="header-stats"><span>Rack: ${g.rack}</span><span>Inning: ${g.currentInning}</span><span>Dead: ${g.deadBalls}</span></div>
+        <div class="scoreboard">
+          <div class="player-card ${g.activePlayer==='player1'?'active':''}">
+            <div class="name">${state.player1.name}</div>
+            <div class="score">${state.player1.score}<span style="font-size:14px;font-weight:normal;">/${state.player1.goal}</span></div>
+            <div class="pt-info">Pt: ${p1Pt.ptText} <span class="pt-next">(Next: ${p1Pt.nextText})</span></div>
+          </div>
+          <div class="player-card ${g.activePlayer==='player2'?'active':''}">
+            <div class="name">${state.player2.name}</div>
+            <div class="score">${state.player2.score}<span style="font-size:14px;font-weight:normal;">/${state.player2.goal}</span></div>
+            <div class="pt-info">Pt: ${p2Pt.ptText} <span class="pt-next">(Next: ${p2Pt.nextText})</span></div>
+          </div>
+        </div>
+        <div class="log-container" id="log-container">${logHTML}</div>
+        
+        <div class="balls-area">
+          ${g.rackEndLocked ? '<div class="overlay-btn-container"><button class="btn primary" id="btn-next-rack" style="width:200px;">Next Rack</button></div>' : ''}
+          <div class="balls-grid">${ballsHTML.split('</div>').slice(0,5).join('</div>')+'</div>'}</div>
+          <div class="balls-grid" style="grid-template-columns: repeat(4, 1fr); max-width: 320px; margin: 0 auto 15px;">${ballsHTML.split('</div>').slice(5,10).join('</div>')}</div>
+        </div>
+        
+        <div class="controls-grid">
+          <button class="btn" id="btn-dead" ${!canDead?'disabled':''}>Dead Ball</button>
+          <button class="btn" id="btn-safety" ${g.safetyLocked||g.rackEndLocked?'disabled':''}>Safety</button>
+          <button class="btn" id="btn-switch">Switch</button>
+          <button class="btn" id="btn-undo">Undo</button>
+        </div>`;
+      
+      const lc = document.getElementById('log-container'); if(lc) lc.scrollTop = lc.scrollHeight;
+    } 
+    else if (state.view === 'result' || state.view === 'record_detail') {
+      let g, p1Win, r, p1Stats, p2Stats, p1Acc, p2Acc, p1MaxRun, p2MaxRun, theLogHTML;
+      
+      if (state.view === 'result') {
+        g = state.game; 
+        p1Win = state.player1.score >= state.player1.goal;
+        r = {
+          startTime: g.startTime, endTime: g.endTime, innings: g.currentInning,
+          p1: state.player1.name, p1Sl: state.player1.sl, p1Score: state.player1.score, p1Goal: state.player1.goal, p1Pts: g.p1Pts,
+          p2: state.player2.name, p2Sl: state.player2.sl, p2Score: state.player2.score, p2Goal: state.player2.goal, p2Pts: g.p2Pts,
+          safeties: g.safeties
+        };
+        p1Stats = g.stats ? g.stats.player1 : { balls:0, misses:0, run:0, maxRun:0 };
+        p2Stats = g.stats ? g.stats.player2 : { balls:0, misses:0, run:0, maxRun:0 };
+        theLogHTML = g.log ? generateLogHTML(g.log) : '';
+      } else {
+        r = state.records[state.selectedRecordIndex];
+        p1Win = r.p1Score >= r.p1Goal;
+        p1Stats = r.stats ? r.stats.player1 : { balls:0, misses:0, run:0, maxRun:0 };
+        p2Stats = r.stats ? r.stats.player2 : { balls:0, misses:0, run:0, maxRun:0 };
+        theLogHTML = r.log ? generateLogHTML(r.log) : '<div style="text-align:center; padding:15px; color:#888;">No log available.</div>';
+      }
+
+      p1Acc = p1Stats.balls + p1Stats.misses > 0 ? Math.round((p1Stats.balls / (p1Stats.balls + p1Stats.misses)) * 100) + '%' : '-';
+      p2Acc = p2Stats.balls + p2Stats.misses > 0 ? Math.round((p2Stats.balls / (p2Stats.balls + p2Stats.misses)) * 100) + '%' : '-';
+      p1MaxRun = p1Stats.maxRun || '-';
+      p2MaxRun = p2Stats.maxRun || '-';
+
+      let controlsHTML = '';
+      if (state.view === 'result') {
+        controlsHTML = `
+          <div style="display:flex; gap:10px; margin-top:15px; flex-shrink:0;">
+            <button class="btn" id="btn-undo" style="margin-bottom:0;">Undo</button>
+            <button class="btn danger-mode" id="btn-dead-result" style="margin-bottom:0;">Dead Ball</button>
+            <button class="btn primary" id="btn-finish" style="margin-bottom:0;">Menu</button>
+          </div>
+        `;
+      } else {
+        controlsHTML = `<button class="btn primary" id="btn-back-records" style="margin-top:15px; margin-bottom:0; flex-shrink:0;">Back to Records</button>`;
+      }
+
+      app.innerHTML = `
+        <div style="display:flex; flex-direction:column; height:100%;">
+          <h2 style="flex-shrink:0; margin-bottom:10px;">${state.view === 'result' ? 'Match Result' : 'Match Detail'}</h2>
+          
+          <div class="result-panel" style="flex-shrink:0; margin-bottom:0; padding:10px;">
+            <strong>Time</strong><br>${formatTime(r.startTime)} - ${formatTime(r.endTime)}<br>
+            <hr style="border:0; border-top:1px solid #333; margin:5px 0;">
+            <strong>Match Stats</strong><br>Innings: ${r.innings}
+          </div>
+          
+          <div class="scoreboard result-board" style="display:flex; gap:10px; width:100%; margin-top:10px; flex-shrink:0;">
+            <div class="player-card ${p1Win?'active':''}" style="flex:1;">
+              ${p1Win?'<div class="winner-crown">WINNER</div>':'<div class="loser-mark">LOSER</div>'}
+              <div class="name">${r.p1} (SL${r.p1Sl})</div>
+              <div style="font-size:36px; font-weight:bold; color:var(--accent-color); margin:10px 0;">
+                ${r.p1Score} <span style="font-size:16px; color:var(--text-main); font-weight:normal;">/ ${r.p1Goal}</span>
+              </div>
+              <div class="result-details">
+                <div><span>Points</span><span style="font-weight:bold; color:var(--text-light);">${r.p1Pts} pt</span></div>
+                <div><span>Safety</span><span>${r.safeties ? r.safeties.player1 : 0}</span></div>
+                <div><span>Accuracy</span><span>${p1Acc}</span></div>
+                <div><span>Max Run</span><span>${p1MaxRun}</span></div>
+              </div>
+            </div>
+            
+            <div class="player-card ${!p1Win?'active':''}" style="flex:1;">
+              ${!p1Win?'<div class="winner-crown">WINNER</div>':'<div class="loser-mark">LOSER</div>'}
+              <div class="name">${r.p2} (SL${r.p2Sl})</div>
+              <div style="font-size:36px; font-weight:bold; color:var(--accent-color); margin:10px 0;">
+                ${r.p2Score} <span style="font-size:16px; color:var(--text-main); font-weight:normal;">/ ${r.p2Goal}</span>
+              </div>
+              <div class="result-details">
+                <div><span>Points</span><span style="font-weight:bold; color:var(--text-light);">${r.p2Pts} pt</span></div>
+                <div><span>Safety</span><span>${r.safeties ? r.safeties.player2 : 0}</span></div>
+                <div><span>Accuracy</span><span>${p2Acc}</span></div>
+                <div><span>Max Run</span><span>${p2MaxRun}</span></div>
+              </div>
+            </div>
+          </div>
+          
+          <div style="flex:1; display:flex; flex-direction:column; background-color:rgba(31,40,51,0.4); border-radius:8px; border:1px solid var(--surface-color); margin-top:10px; min-height:0;">
+            <div style="padding:6px; text-align:center; font-size:12px; color:var(--text-muted); border-bottom:1px solid rgba(255,255,255,0.05); font-weight:bold; flex-shrink:0;">Inning Log</div>
+            <div style="overflow-y:auto; flex:1; padding: 0 5px;">
+              <div class="log-container" style="margin:0; border:none; background:transparent;">${theLogHTML}</div>
+            </div>
+          </div>
+
+          ${controlsHTML}
+        </div>`;
+    }
+    else if (state.view === 'records') {
+      let listHTML = (!state.records || state.records.length === 0) 
+        ? '<p style="text-align:center; margin-top:30px;">No records found.</p>' : '';
+      if (state.records) {
+        state.records.forEach((r, idx) => {
+          listHTML += `
+            <div class="record-item" data-index="${idx}">
+              <button class="btn-delete-record" data-index="${idx}">✖</button>
+              <div style="font-size: 12px; color: var(--accent-hover); margin-bottom: 5px;">${r.date} - Inning: ${r.innings}</div>
+              <div style="font-weight: bold; color: var(--text-light);">${r.p1} [${r.p1Pts}pt] vs ${r.p2} [${r.p2Pts}pt]</div>
+              <div style="font-size: 11px; color: #777; text-align: right; margin-top: 8px;">Tap to see details ≫</div>
+            </div>`;
+        });
+      }
+
+      let deleteModalHTML = '';
+      if (state.deleteModal && state.deleteModal.show) {
+        const msg = state.deleteModal.type === 'all' 
+          ? 'すべての履歴を削除しますか？<span class="modal-sub">（この操作は取り消せません）</span>' 
+          : 'この履歴を削除しますか？';
+        deleteModalHTML = `
+          <div class="modal-overlay">
+            <div class="modal-box">
+              <div class="modal-msg">${msg}</div>
+              <div class="modal-btns">
+                <button class="btn" id="btn-cancel-delete">Cancel</button>
+                <button class="btn danger-mode" id="btn-confirm-delete">Delete</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      app.innerHTML = `
+        ${deleteModalHTML}
+        <div style="display:flex; flex-direction:column; height:100%;">
+          <div class="top-nav" style="flex-shrink:0;">
+            <h2 style="margin:0;">Match Records</h2>
+            <button id="btn-clear-records" class="btn danger-mode" style="width:auto; padding:8px 12px; margin:0; font-size:12px;">Delete All</button>
+          </div>
+          <div class="scroll-area" style="flex:1;">${listHTML}</div>
+          <button class="btn" id="btn-finish" style="flex-shrink:0; margin-top:10px;">Back to Menu</button>
+        </div>
+      `;
+    }
+  }
+
+  document.addEventListener('input', (e) => {
+    if (e.target.id === 'p1-name') {
+      const lbl = document.getElementById('label-p1'); if (lbl) lbl.textContent = e.target.value || 'Player 1';
+      state.player1.name = e.target.value || 'Player 1';
+    }
+    if (e.target.id === 'p2-name') {
+      const lbl = document.getElementById('label-p2'); if (lbl) lbl.textContent = e.target.value || 'Player 2';
+      state.player2.name = e.target.value || 'Player 2';
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    const id = e.target.id; const g = state.game;
+    
+    if (id === 'btn-nav-records') { state.view = 'records'; render(); return; }
+    if (id === 'btn-back-records') { state.view = 'records'; render(); return; }
+    
+    if (e.target.closest('.btn-delete-record')) {
+      e.stopPropagation(); 
+      const idx = parseInt(e.target.closest('.btn-delete-record').dataset.index);
+      state.deleteModal = { show: true, type: 'single', index: idx };
+      render(); return;
+    }
+    if (id === 'btn-clear-records') {
+      state.deleteModal = { show: true, type: 'all', index: null };
+      render(); return;
+    }
+    if (id === 'btn-cancel-delete') {
+      state.deleteModal = { show: false, type: '', index: null };
+      render(); return;
+    }
+    if (id === 'btn-confirm-delete') {
+      if (state.deleteModal.type === 'all') state.records = [];
+      else if (state.deleteModal.type === 'single' && state.deleteModal.index !== null) state.records.splice(state.deleteModal.index, 1);
+      state.deleteModal = { show: false, type: '', index: null };
+      render(); return;
+    }
+
+    if (e.target.closest('.record-item')) {
+      state.selectedRecordIndex = parseInt(e.target.closest('.record-item').dataset.index);
+      state.view = 'record_detail'; render(); return;
+    }
+
+    if (id === 'btn-quit-match') { g.showQuitConfirm = true; render(); return; }
+    if (id === 'btn-cancel-quit') { g.showQuitConfirm = false; render(); return; }
+    if (id === 'btn-confirm-quit') { state.view = 'setup'; state.game = null; state.history = []; render(); return; }
+    if (id === 'btn-finish') { state.view = 'setup'; render(); return; }
+
+    if (id === 'btn-start') {
+      state.player1.name = document.getElementById('p1-name').value || 'Player 1'; 
+      state.player2.name = document.getElementById('p2-name').value || 'Player 2';
+      state.player1.sl = parseInt(document.getElementById('p1-sl').value); state.player2.sl = parseInt(document.getElementById('p2-sl').value);
+      state.player1.goal = JPA_GOALS[state.player1.sl]; state.player2.goal = JPA_GOALS[state.player2.sl];
+      state.player1.score = 0; state.player2.score = 0;
+      
+      state.game = { 
+        activePlayer: document.querySelector('input[name="startP"]:checked').value, 
+        currentInning: 1, 
+        log: { 1: { player1: {events:[], s:false, b:false}, player2: {events:[], s:false, b:false} } }, 
+        pendingBreak: true, deadBalls: 0, safeties: {player1:0, player2:0}, 
+        stats: { player1: { balls:0, misses:0, run:0, maxRun:0 }, player2: { balls:0, misses:0, run:0, maxRun:0 } },
+        balls: [1,2,3,4,5,6,7,8,9], rack: 1, safetyLocked: false, rackEndLocked: false, showQuitConfirm: false,
+        startTime: new Date().getTime()
+      };
+      state.view = 'game'; render(); return;
+    }
+    
+    // スコア加算（ボールタップ時）
+    if (e.target.closest('.ball')) {
+      const n = parseInt(e.target.closest('.ball').dataset.num); 
+      if(g.safetyLocked || g.rackEndLocked || !g.balls.includes(n)) return;
+      
+      state.history.push(JSON.parse(JSON.stringify({p1:state.player1, p2:state.player2, g:state.game})));
+      g.balls = g.balls.filter(b => b !== n);
+      
+      if (!g.stats) g.stats = { player1: { balls:0, misses:0, run:0, maxRun:0 }, player2: { balls:0, misses:0, run:0, maxRun:0 } };
+      if(g.pendingBreak) { g.log[g.currentInning][g.activePlayer].b = true; g.pendingBreak = false; }
+      
+      g.log[g.currentInning][g.activePlayer].events.push({num:n, type:'score'});
+      state[g.activePlayer].score += (n === 9 ? 2 : 1);
+      g.stats[g.activePlayer].balls++;
+      g.stats[g.activePlayer].run++;
+      g.stats[g.activePlayer].maxRun = Math.max(g.stats[g.activePlayer].maxRun, g.stats[g.activePlayer].run);
+      
+      if(n === 9 || g.balls.length === 0) {
+        g.rackEndLocked = true;
+        if (n === 9 && g.balls.length > 0) g.deadBalls += g.balls.length;
+      }
+      
+      if(state.player1.score >= state.player1.goal || state.player2.score >= state.player2.goal) {
+        g.endTime = new Date().getTime();
+        const p1W = state.player1.score >= state.player1.goal;
+        const lp = getLoserPoints(p1W ? state.player2.sl : state.player1.sl, p1W ? state.player2.score : state.player1.score);
+        g.p1Pts = p1W ? 20-lp : lp; g.p2Pts = p1W ? lp : 20-lp; 
+        
+        state.records.unshift({
+          date: new Date(g.endTime).toLocaleString(),
+          p1: state.player1.name, p2: state.player2.name,
+          p1Sl: state.player1.sl, p2Sl: state.player2.sl,
+          p1Score: state.player1.score, p2Score: state.player2.score,
+          p1Goal: state.player1.goal, p2Goal: state.player2.goal,
+          p1Pts: g.p1Pts, p2Pts: g.p2Pts,
+          innings: g.currentInning, startTime: g.startTime, endTime: g.endTime,
+          safeties: { player1: g.safeties.player1, player2: g.safeties.player2 },
+          stats: clone(g.stats), log: clone(g.log)
+        });
+        state.view = 'result';
+      }
+      render(); return;
+    }
+    
+    // 事後Dead変換処理（Game画面 ＆ Result画面）
+    if (id === 'btn-dead' || id === 'btn-dead-result') {
+      const pLog = g.log[g.currentInning][g.activePlayer];
+      if (pLog && pLog.events.length > 0) {
+        const lastEv = pLog.events[pLog.events.length - 1];
+        if (lastEv.type === 'score') {
+          state.history.push(JSON.parse(JSON.stringify({p1:state.player1, p2:state.player2, g:state.game})));
+          
+          lastEv.type = 'dead';
+          state[g.activePlayer].score -= (lastEv.num === 9 ? 2 : 1);
+          g.deadBalls++;
+          if (g.stats) { g.stats[g.activePlayer].balls--; g.stats[g.activePlayer].run--; }
+          
+          if (state.view === 'result') {
+            if (state.player1.score < state.player1.goal && state.player2.score < state.player2.goal) {
+              state.view = 'game';
+              state.records.shift();
+            }
+          }
+          render();
+        }
+      }
+      return;
+    }
+    
+    if (id === 'btn-next-rack') { g.rack++; g.balls=[1,2,3,4,5,6,7,8,9]; g.rackEndLocked=false; g.pendingBreak=true; render(); return; }
+    if (id === 'btn-safety') { 
+      state.history.push(JSON.parse(JSON.stringify({p1:state.player1, p2:state.player2, g:state.game}))); 
+      if (!g.stats) g.stats = { player1: { balls:0, misses:0, run:0, maxRun:0 }, player2: { balls:0, misses:0, run:0, maxRun:0 } };
+      g.safeties[g.activePlayer]++; g.stats[g.activePlayer].run = 0; 
+      g.log[g.currentInning][g.activePlayer].s=true; g.safetyLocked=true; render(); return; 
+    }
+    if (id === 'btn-switch') {
+      state.history.push(JSON.parse(JSON.stringify({p1:state.player1, p2:state.player2, g:state.game})));
+      g.safetyLocked = false;
+      if (!g.stats) g.stats = { player1: { balls:0, misses:0, run:0, maxRun:0 }, player2: { balls:0, misses:0, run:0, maxRun:0 } };
+      g.stats[g.activePlayer].misses++; g.stats[g.activePlayer].run = 0;
+      
+      if(g.pendingBreak) { g.log[g.currentInning][g.activePlayer].b=true; g.pendingBreak=false; }
+      if(g.activePlayer==='player2'){ g.activePlayer='player1'; g.currentInning++; g.log[g.currentInning]={player1:{events:[],s:false,b:false},player2:{events:[],s:false,b:false}}; }
+      else g.activePlayer='player2';
+      render(); return;
+    }
+    
+    // Undo処理
+    if (id === 'btn-undo' && state.history.length > 0) { 
+      const s = state.history.pop(); 
+      state.player1=s.p1; state.player2=s.p2; state.game=s.g; 
+      if (state.view === 'result') { state.view = 'game'; state.records.shift(); }
+      render(); return; 
+    }
+  });
+
+  try {
+    const data = localStorage.getItem(SAVE_KEY);
+    if (data) {
+      const parsed = JSON.parse(data);
+      if (parsed && parsed.view) {
+        state = parsed;
+        if (!state.deleteModal) state.deleteModal = { show: false, type: '', index: null };
+      }
+    }
+  } catch(e) {}
+  
+  const originalRender = render;
+  render = function() {
+    originalRender();
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch(e) {}
+  };
+
+  render();
+</script>
+</body>
+</html>
